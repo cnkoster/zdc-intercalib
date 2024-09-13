@@ -27,11 +27,7 @@
 #include "Common/CCDB/TriggerAliases.h"
 #include "Common/DataModel/Centrality.h"
 #include "Common/DataModel/Multiplicity.h"
-#include "ZDCInterCalib.h"
-
 #include "TH1F.h"
-#include "TH2F.h"
-#include "TMinuit.h"
 
 using namespace o2;
 using namespace o2::framework;
@@ -55,23 +51,26 @@ struct zdcInterCalib {
   //
   Configurable<int> nBins{"nBins", 400, "n bins"};
   Configurable<float> MaxZN{"MaxZN", 399.5, "Max ZN signal"};
+  Configurable<bool> writeHistos{"writeHistos", true, "Flag to save histos"};
   //
   HistogramRegistry registry{"Histos", {}, OutputObjHandlingPolicy::AnalysisObject};
 
   void init(InitContext const&)
   {
-    registry.add("ZNApmc", "ZNApmc; ZNA PMC; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
-    registry.add("ZNCpmc", "ZNCpmc; ZNC PMC; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
-    registry.add("ZNApm1", "ZNApm1; ZNA PM1; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
-    registry.add("ZNApm2", "ZNApm2; ZNA PM2; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
-    registry.add("ZNApm3", "ZNApm3; ZNA PM3; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
-    registry.add("ZNApm4", "ZNApm4; ZNA PM4; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
-    registry.add("ZNCpm1", "ZNCpm1; ZNC PM1; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
-    registry.add("ZNCpm2", "ZNCpm2; ZNC PM2; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
-    registry.add("ZNCpm3", "ZNCpm3; ZNC PM3; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
-    registry.add("ZNCpm4", "ZNCpm4; ZNC PM4; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
-    registry.add("ZNAsumq", "ZNAsumq; ZNA uncalib. sum PMQ; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
-    registry.add("ZNCsumq", "ZNCsumq; ZNC uncalib. sum PMQ; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
+    if(writeHistos) {
+      registry.add("ZNApmc", "ZNApmc; ZNA PMC; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
+      registry.add("ZNCpmc", "ZNCpmc; ZNC PMC; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
+      registry.add("ZNApm1", "ZNApm1; ZNA PM1; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
+      registry.add("ZNApm2", "ZNApm2; ZNA PM2; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
+      registry.add("ZNApm3", "ZNApm3; ZNA PM3; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
+      registry.add("ZNApm4", "ZNApm4; ZNA PM4; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
+      registry.add("ZNCpm1", "ZNCpm1; ZNC PM1; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
+      registry.add("ZNCpm2", "ZNCpm2; ZNC PM2; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
+      registry.add("ZNCpm3", "ZNCpm3; ZNC PM3; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
+      registry.add("ZNCpm4", "ZNCpm4; ZNC PM4; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
+      registry.add("ZNAsumq", "ZNAsumq; ZNA uncalib. sum PMQ; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
+      registry.add("ZNCsumq", "ZNCsumq; ZNC uncalib. sum PMQ; Entries", {HistType::kTH1F, {{nBins, -0.5, MaxZN}}});
+    }
   }
 
   void process(ColEvSels const& cols, BCsRun3 const& /*bcs*/, aod::Zdcs const& /*zdcs*/)
@@ -88,6 +87,9 @@ struct zdcInterCalib {
         double pmcZNC = zdc.energyCommonZNC();
         double pmcZNA = zdc.energyCommonZNA();
         //
+        //double tdcZNC = zdc.zdc.timeZNC();
+        //double tdcZNA = zdc.zdc.timeZNA();
+        //
         bool isZNChit = true, isZNAhit = true;
         if (pmcZNC < kVeryNegative) {
           pmcZNC = kVeryNegative;
@@ -98,8 +100,8 @@ struct zdcInterCalib {
           isZNAhit = false;
         }
         //
-        auto sumZNC = kVeryNegative;
-        auto sumZNA = kVeryNegative;
+        double sumZNC = 0;
+        double sumZNA = 0;
         double pmqZNC[4] = {0, 0, 0, 0,};
         double pmqZNA[4] = {0, 0, 0, 0,};
         //
@@ -108,14 +110,14 @@ struct zdcInterCalib {
             pmqZNC[it] = (zdc.energySectorZNC())[it];
             sumZNC += pmqZNC[it];
           }
-          registry.get<TH1>(HIST("ZNCpmc"))->Fill(pmcZNC);
-          registry.get<TH1>(HIST("ZNCpm1"))->Fill(pmqZNC[0]);
-          registry.get<TH1>(HIST("ZNCpm2"))->Fill(pmqZNC[1]);
-          registry.get<TH1>(HIST("ZNCpm3"))->Fill(pmqZNC[2]);
-          registry.get<TH1>(HIST("ZNCpm4"))->Fill(pmqZNC[3]);
-          registry.get<TH1>(HIST("ZNCsumq"))->Fill(sumZNC);
-          //
-          cumulate(0, pmcZNC, pmqZNC[0], pmqZNC[1], pmqZNC[2], pmqZNC[3], 1.);
+          if(writeHistos) {
+            registry.get<TH1>(HIST("ZNCpmc"))->Fill(pmcZNC);
+            registry.get<TH1>(HIST("ZNCpm1"))->Fill(pmqZNC[0]);
+            registry.get<TH1>(HIST("ZNCpm2"))->Fill(pmqZNC[1]);
+            registry.get<TH1>(HIST("ZNCpm3"))->Fill(pmqZNC[2]);
+            registry.get<TH1>(HIST("ZNCpm4"))->Fill(pmqZNC[3]);
+            registry.get<TH1>(HIST("ZNCsumq"))->Fill(sumZNC);
+          }
         }
         if(isZNAhit) {
           for(int it=0; it<4; it++) {
@@ -123,14 +125,14 @@ struct zdcInterCalib {
             sumZNA += pmqZNA[it];
           }
           //
-          registry.get<TH1>(HIST("ZNApmc"))->Fill(pmcZNA);
-          registry.get<TH1>(HIST("ZNApm1"))->Fill(pmqZNA[0]);
-          registry.get<TH1>(HIST("ZNApm2"))->Fill(pmqZNA[1]);
-          registry.get<TH1>(HIST("ZNApm3"))->Fill(pmqZNA[2]);
-          registry.get<TH1>(HIST("ZNApm4"))->Fill(pmqZNA[3]);
-          registry.get<TH1>(HIST("ZNAsumq"))->Fill(sumZNA);
-          //
-          cumulate(1, pmcZNA, pmqZNA[0], pmqZNA[1], pmqZNA[2], pmqZNA[3], 1.);
+          if(writeHistos) {
+            registry.get<TH1>(HIST("ZNApmc"))->Fill(pmcZNA);
+            registry.get<TH1>(HIST("ZNApm1"))->Fill(pmqZNA[0]);
+            registry.get<TH1>(HIST("ZNApm2"))->Fill(pmqZNA[1]);
+            registry.get<TH1>(HIST("ZNApm3"))->Fill(pmqZNA[2]);
+            registry.get<TH1>(HIST("ZNApm4"))->Fill(pmqZNA[3]);
+            registry.get<TH1>(HIST("ZNAsumq"))->Fill(sumZNA);
+          }
         }
         if (isZNAhit || isZNChit) (pmcZNA, pmqZNA[0], pmqZNA[1], pmqZNA[2], pmqZNA[3], pmcZNC, pmqZNC[0], pmqZNC[1], pmqZNC[2], pmqZNC[3]);
       }
