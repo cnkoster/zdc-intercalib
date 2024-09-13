@@ -52,10 +52,6 @@ struct zdcInterCalib {
   Produces<aod::ZDCInterCalib> zTab;
 
   // Configurable parameters
-  Configurable<double> lowbnd{"lowbnd", 0.1, "lower bound for minimization"};
-  Configurable<double> uppbnd{"uppbnd", 10., "upper bound for minimization"};
-  Configurable<double> start{"start", 0.8, "start value for minimization"};
-  Configurable<double> step{"step", 0.1, "step value for minimization"};
   //
   Configurable<int> nBins{"nBins", 400, "n bins"};
   Configurable<float> MaxZN{"MaxZN", 399.5, "Max ZN signal"};
@@ -139,105 +135,8 @@ struct zdcInterCalib {
         if (isZNAhit || isZNChit) (pmcZNA, pmqZNA[0], pmqZNA[1], pmqZNA[2], pmqZNA[3], pmcZNC, pmqZNC[0], pmqZNC[1], pmqZNC[2], pmqZNC[3]);
       }
     }
-    //
-    /*for (int ih = 0; ih < ndet; ih++) {
-      int ierr = minimization(ih);
-      if (mSum[ih][5][5] >= 0.) {
-        if (ierr) {
-          printf(" -- FAILED processing data for detector %d\n\n", ih);
-        } else {
-          printf(" +++ Calculating intercalibration coeff. for det. %d", ih);
-        }
-      } else {
-        printf(" -- FAILED processing data for det. %d, reason might be TOO FEW EVENTS! [nev = %1.0f]", ih, mSum[ih][5][5]);
-      }
-    }*/
   }
   
-
-  void cumulate(int ih, double tc, double t1, double t2, double t3, double t4, double w = 1)
-  {
-
-    if ((ih<0 || ih>1)){
-      return;
-    }
-
-    double val[npar] = {0, 0, 0, 0, 0, 1};
-    val[0] = tc;
-    val[1] = t1;
-    val[2] = t2;
-    val[3] = t3;
-    val[4] = t4;
-    //printf(" det.%d  mSum \n ", ih);
-    for (int32_t i = 0; i < npar; i++) {
-      for (int32_t j = i; j < npar; j++) {
-        mSum[ih][i][j] += val[i] * val[j] * w;
-        //printf(" %1.0f ", mSum[ih][i][j]);
-      }
-      //printf(" \n");
-    }
-    //printf(" \n");
-
-  }
-
-  static void fcn(int &npar, double *gin, double &f, double *par, int iflag)  
-  {
-      //calculate chisquare
-      Double_t chi = 0;
-      for (int32_t i = 0; i < npar; i++) {
-        for (int32_t j = 0; j < npar; j++) {
-          chi += (i == 0 ? par[i] : -par[i]) * (j == 0 ? par[j] : -par[j]) * mAdd[i][j];
-        }
-      }
-      f = chi;
-  }
-
-  int minimization(int ih)
-  {
-    for (int i = 0; i < npar; i++) {
-      for (int j = 0; j < npar; j++) {
-        if (j < i) {
-          mAdd[i][j] = mSum[ih][j][i];
-        } else {
-          mAdd[i][j] = mSum[ih][i][j];
-        }
-      }
-    }
-    //
-    double arglist[10];
-    int ierflg = 0;
-    TMinuit *gMinuit = new TMinuit(npar);  
-    gMinuit->SetFCN(fcn);
-    
-    arglist[0] = 1;
-    gMinuit->mnexcm("SET ERR", arglist , 1, ierflg);
-    
-    // We introduce the calibration of the common PM in separate workflows
-    // Calibration cvoefficient is forced to and step is forced to zero
-    gMinuit->mnparm(0, "c0", 1., 0., 1., 1., ierflg);
-    //
-    gMinuit->mnparm(1, "c1", start, step, lowbnd, uppbnd, ierflg);
-    gMinuit->mnparm(2, "c2", start, step, lowbnd, uppbnd, ierflg);
-    gMinuit->mnparm(3, "c3", start, step, lowbnd, uppbnd, ierflg);
-    gMinuit->mnparm(4, "c4", start, step, lowbnd, uppbnd, ierflg);
-
-    double coeff[npar], coefferr[npar];
-    for ( int i = 0; i < npar; i++) {
-      gMinuit->GetParameter(i, coeff[i], coefferr[i]);
-      //if(ih==0)  registry.get<TH1>(HIST("ZNCcalibcoeff"))->Fill(coeff[i]);
-      //else if (ih==1) registry.get<TH1>(HIST("ZNAcalibcoeff"))->Fill(coeff[i]);
-    }
-    //
-    printf("\n\t _________________________ CALIBRATION COEFFICIENTS _________________________\n");
-    if(ih==0) printf("\t - ZNC:  pmq1 %f  pmq2 %f  pmq3 %f  pmq4 %f \n", coeff[1], coeff[2], coeff[3], coeff[4]);
-    else if(ih==1) printf("\t - ZNA:  pmq1 %f  pmq2 %f  pmq3 %f  pmq4 %f \n", coeff[1], coeff[2], coeff[3], coeff[4]);
-    //double sumqcorr = c1 * x[1] + c2 * x[2] + c3 * x[3] + c4 * x[4];
-    
-    // OFFSET NON IMPLEMENTED FOR THE TIME BEING!
-    // see $O2/Detectors/ZDC/calib/src/InterCalib.cxx to see how it is done on raw data
-
-     return ierflg;
-   }
 };
 
 
