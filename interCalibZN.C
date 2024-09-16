@@ -25,7 +25,7 @@
 
 void setCosm();
 void cumulate(int ih, double tc, double t1, double t2, double t3, double t4, double w);
-static void fcn(int &npar, double *gin, double &f, double *par, int iflag);
+static void fcn(int &np, double *gin, double &f, double *par, int iflag);
 int minimization(int ih); 
 
 constexpr double kVeryNegative = -1.e12;
@@ -137,6 +137,17 @@ void interCalibZN (TString inputfilename = "treeZNpms.root")
     }
   }
 
+  TFile *fout = new TFile("ZNic.root","RECREATE");
+  fout->cd();
+
+  hpmcZNC->Write();
+  hpmcZNA->Write();
+  hsumZNC->Write();
+  hsumZNA->Write();
+
+  fout->Close();
+
+
 }
 
 void cumulate(int ih, double tc, double t1, double t2, double t3, double t4, double w = 1)
@@ -165,12 +176,12 @@ void cumulate(int ih, double tc, double t1, double t2, double t3, double t4, dou
 
 }
 
-static void fcn(int &npar, double *gin, double &f, double *par, int iflag)  
+static void fcn(int &np, double *gin, double &f, double *par, int iflag)  
 {
     // Calculate chisquare
     Double_t chi = 0;
-    for (int32_t i = 0; i < npar; i++) {
-      for (int32_t j = 0; j < npar; j++) {
+    for (int32_t i = 0; i < np; i++) {
+      for (int32_t j = 0; j < np; j++) {
         chi += (i == 0 ? par[i] : -par[i]) * (j == 0 ? par[j] : -par[j]) * mAdd[i][j];
       }
     }
@@ -195,7 +206,7 @@ int minimization(int ih)
     TMinuit *gMinuit = new TMinuit(npar);  
     gMinuit->SetFCN(fcn);
     
-    arglist[0] = 1;
+    //arglist[0] = 1;
     gMinuit->mnexcm("SET ERR", arglist , 1, ierflg);
     
     // Set starting values and step sizes for parameters
@@ -206,6 +217,7 @@ int minimization(int ih)
     gMinuit->mnparm(2, "c2", start, step, lowbnd, uppbnd, ierflg);
     gMinuit->mnparm(3, "c3", start, step, lowbnd, uppbnd, ierflg);
     gMinuit->mnparm(4, "c4", start, step, lowbnd, uppbnd, ierflg);
+    gMinuit->mnparm(0, "c5",    1.,   0.,     1.,     1., ierflg);
 
     // Minimization step
     //arglist[0] = 500;
