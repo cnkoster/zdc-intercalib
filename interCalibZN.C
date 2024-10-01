@@ -29,23 +29,25 @@ static void fcn(int &np, double *gin, double &f, double *par, int iflag);
 int minimization(int ih); 
 TCanvas* plotTProfiles(std::vector<TProfile*> profiles, const char* name);
 
-constexpr double kVeryNegative = -1.e12; // assign this when ZDC when energy is negative (unphysical?)
+constexpr double kVeryNegative = -1.e12; // assign this when ZDC when energy is negative 
 //
-constexpr int ndet = 2;  // for 2 sides A side and C side 
-constexpr int npar = 6; // number of towers:  1x common, 4x tower, 1 for weight 
+constexpr int ndet = 2; 
+constexpr int npar = 6; 
 //
-static double mSum[ndet][npar][npar]; // for each side a and c a 6x6 matrix containing sum(ti*tj*w) sum v
+static double mSum[ndet][npar][npar]; 
 static double mAdd[npar][npar];
 //
 const float xmin = -0.5;
-const float xmax = 2000;
+const float xmax = 8000;
 //
 const float lowbnd = 0.1;
 const float uppbnd = 10.;
 const float start = 0.8; 
 const float step = 0.01;
+
+bool deming = true;
 //
-double coeff[ndet][npar], coefferr[ndet][npar]; // coefficients for ZNA&ZNC (ih) and for number of towers+weight. 
+double coeff[ndet][npar], coefferr[ndet][npar]; 
 
 TH1F *ZNCcalibcoeff = new TH1F("ZNCcalibcoeff","Calib Coeff ZNC", 4, 0, 4);
 ZNCcalibcoeff->GetXaxis()->SetBinLabel(1,"pmq1");
@@ -107,28 +109,26 @@ void interCalibZN (TString inputfilename = "treeZNpms.root")
   tree->SetBranchAddress("fpm3ZNC", &pm3ZNC);
   tree->SetBranchAddress("fpm4ZNC", &pm4ZNC);
 
-  TH1F *hpmcZNC = new TH1F("hpmcZNC"," PMC ZNC", 40, xmin, 4*xmax);
-  TH1F *hpmcZNA = new TH1F("hpmcZNA"," PMC ZNA", 40, xmin, 4*xmax);
-  TH1F *hsumZNC = new TH1F("hsumZNC"," uncalibrated SUMq ZNC", 40, xmin, 4*xmax);
-  TH1F *hsumZNA = new TH1F("hsumZNA"," uncalibrated SUMq ZNA", 40, xmin, 4*xmax);
+  TH1F *hpmcZNC = new TH1F("hpmcZNC"," PMC ZNC", 40, xmin, xmax);
+  TH1F *hpmcZNA = new TH1F("hpmcZNA"," PMC ZNA", 40, xmin, xmax);
+  TH1F *hsumZNC = new TH1F("hsumZNC"," uncalibrated SUMq ZNC", 40, xmin, xmax);
+  TH1F *hsumZNA = new TH1F("hsumZNA"," uncalibrated SUMq ZNA", 40, xmin, xmax);
 
-  //   TH1F *hpmcZNC = new TH1F("hpmcZNC"," PMC ZNC", 40, xmin, 4*xmax);
-  // TH1F *hpmcZNA = new TH1F("hpmcZNA"," PMC ZNA", 40, xmin, 4*xmax);
-  TH1F *hsumZNC_cal = new TH1F("hsumZNC_cal","calibrated SUMq ZNC", 40, xmin, 4*xmax);
-  TH1F *hsumZNA_cal = new TH1F("hsumZNA_cal","calibrated SUMq ZNA", 40, xmin, 4*xmax);
+  TH1F *hsumZNC_cal = new TH1F("hsumZNC_cal","calibrated SUMq ZNC", 40, xmin, xmax);
+  TH1F *hsumZNA_cal = new TH1F("hsumZNA_cal","calibrated SUMq ZNA", 40, xmin, xmax);
 
   int nbins = 100; 
-  TH2F *hpmcZNC_vs_sum = new TH2F("hpmcZNC_vs_sum", "pmcq vs. sum ZNC", nbins, xmin, 4*xmax, nbins, xmin, 4*xmax); 
-  TH2F *hpmcZNA_vs_sum = new TH2F("hpmcZNA_vs_sum", "pmcq vs. sum ZNA", nbins, xmin, 4*xmax, nbins, xmin, 4*xmax); 
+  TH2F *hpmcZNC_vs_sum = new TH2F("hpmcZNC_vs_sum", "pmcq vs. sum ZNC", nbins, xmin, xmax, nbins, xmin, xmax); 
+  TH2F *hpmcZNA_vs_sum = new TH2F("hpmcZNA_vs_sum", "pmcq vs. sum ZNA", nbins, xmin, xmax, nbins, xmin, xmax); 
 
-  TH2F *hpmcZNC_vs_sum_cal = new TH2F("hpmcZNC_vs_sum_cal", "pmcq vs. calibrated sum ZNC", nbins, xmin, 4*xmax, nbins, xmin, 4*xmax); 
-  TH2F *hpmcZNA_vs_sum_cal = new TH2F("hpmcZNA_vs_sum_cal", "pmcq vs. calibrated sum ZNA", nbins, xmin, 4*xmax, nbins, xmin, 4*xmax); 
+  TH2F *hpmcZNC_vs_sum_cal = new TH2F("hpmcZNC_vs_sum_cal", "pmcq vs. calibrated sum ZNC", nbins, xmin, xmax, nbins, xmin, xmax); 
+  TH2F *hpmcZNA_vs_sum_cal = new TH2F("hpmcZNA_vs_sum_cal", "pmcq vs. calibrated sum ZNA", nbins, xmin, xmax, nbins, xmin, xmax); 
 
-  TProfile *hpmcZNC_vs_sum_tp = new TProfile("hpmcZNC_vs_sum_tp", "Before", nbins, xmin, 4*xmax);
-  TProfile *hpmcZNA_vs_sum_tp = new TProfile("hpmcZNA_vs_sum_tp", "Before", nbins, xmin, 4*xmax);
+  TProfile *hpmcZNC_vs_sum_tp = new TProfile("hpmcZNC_vs_sum_tp", "Before", nbins, xmin, xmax);
+  TProfile *hpmcZNA_vs_sum_tp = new TProfile("hpmcZNA_vs_sum_tp", "Before", nbins, xmin, xmax);
 
-  TProfile *hpmcZNC_vs_sum_cal_tp = new TProfile("hpmcZNC_vs_sum_cal_tp", "After", nbins, xmin, 4*xmax);
-  TProfile *hpmcZNA_vs_sum_cal_tp = new TProfile("hpmcZNA_vs_sum_cal_tp", "After", nbins, xmin, 4*xmax);
+  TProfile *hpmcZNC_vs_sum_cal_tp = new TProfile("hpmcZNC_vs_sum_cal_tp", "After", nbins, xmin, xmax);
+  TProfile *hpmcZNA_vs_sum_cal_tp = new TProfile("hpmcZNA_vs_sum_cal_tp", "After", nbins, xmin, xmax);
 
 
   for(Int_t iev=0; iev<nentries; iev++){
@@ -239,7 +239,6 @@ void interCalibZN (TString inputfilename = "treeZNpms.root")
   TCanvas* cZNC = plotTProfiles({hpmcZNC_vs_sum_tp, hpmcZNC_vs_sum_cal_tp}, "ZNC"); 
   TCanvas* cZNA = plotTProfiles({hpmcZNA_vs_sum_tp, hpmcZNA_vs_sum_cal_tp}, "ZNA"); 
 
-
   TFile *fout = new TFile("ZNic.root","RECREATE");
   fout->cd();
 
@@ -279,10 +278,6 @@ void interCalibZN (TString inputfilename = "treeZNpms.root")
 
 void cumulate(int ih, double tc, double t1, double t2, double t3, double t4, double w = 1)
 {
-  //This function is called for each entry in the tree!! 
-  //Here mSum is filled! 
-  
-  // ih is only 0 (ZNC) or 1 (ZNA)! 
     if ((ih<0 || ih>1)){
       return;
     }
@@ -294,30 +289,15 @@ void cumulate(int ih, double tc, double t1, double t2, double t3, double t4, dou
     val[2] = t2;
     val[3] = t3;
     val[4] = t4;
-    // printf(" det.%d \t mSum \n ", ih);
-    for (int32_t i = 0; i < npar; i++) { // sum 0-5 (common and all towers)
-      // so for each tower i
+    printf(" det.%d \t mSum \n ", ih);
+    for (int32_t i = 0; i < npar; i++) { 
       for (int32_t j = i; j < npar; j++) {
-        // add all values 
-        // i=1: t1*t1*w + t1*t2*w + t1*t3*w + ...... t5*w
-        // i=2:           t1*t2*w + t1*t3*w + ...... t5*w
-        // i=3:                     t1*t3*w + ...... t5*w
-
         mSum[ih][i][j] += val[i] * val[j] * w; 
-        // mSum[ih][0][0] has value: tc * tc * w 
-        // msum[ih][0][5] has value: ( tc*tc + tc*t1 + tc*t2 + ... + tc*t5 )*w  
-
-        // mSum[ih][1][0] has value: empty. (j=i so j is never 0)
-        // msum[ih][1][5] has value: ( t1*t1 + t1*t2 + ... + t1*t5 )*w  
-
-        // IMPORTANT : it adds these values for ALL the entries in the tree! 
-
-        // printf(" %1.0f ", mSum[ih][i][j]);
       }
       
-      // printf(" \n");
+      printf(" \n");
     }
-    // printf(" \n");
+    printf(" \n");
 
 }
 
@@ -326,11 +306,15 @@ static void fcn(int &np, double *gin, double &f, double *par, int iflag)
     // Calculate chisquare
     Double_t chi = 0;
     // NOTE: changed <np to <= np to include np=4 because otherwise the 4th parameter is not determined.. 
-    for (int32_t i = 0; i <= np; i++) {
-      for (int32_t j = 0; j <= np; j++) {
+    for (int32_t i = 0; i < npar; i++) {
+      for (int32_t j = 0; j < npar; j++) {
         chi += (i == 0 ? par[i] : -par[i]) * (j == 0 ? par[j] : -par[j]) * mAdd[i][j];
       }
     }
+    // printf("it changed.");
+
+    if(deming) chi = chi / (1 + par[1] * par[1] + par[2] * par[2] + par[3] * par[3] + par[4] * par[4]);
+
     f = chi;
     // printf("chi_sq = %e   | np = %i \n", f, np); 
 }
@@ -478,7 +462,6 @@ TCanvas* plotTProfiles(std::vector<TProfile*> profiles, const char* name){
       profile->GetYaxis()->SetTitleOffset(1.9);
       profile->GetYaxis()->SetMaxDigits(3);
       profile->GetXaxis()->SetMaxDigits(3);
-      // profile->SetTitle(TString::Format("Common vs. sum %s", name)); 
       profile->Draw("PLC PMC"); 
     } 
     else{
