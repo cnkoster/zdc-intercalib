@@ -293,6 +293,7 @@ void cumulate(int ih, double tc, double t1, double t2, double t3, double t4, dou
     for (int32_t i = 0; i < npar; i++) { 
       for (int32_t j = i; j < npar; j++) {
         mSum[ih][i][j] += val[i] * val[j] * w; 
+        printf(" %1.0f ", mSum[ih][i][j]);
       }
       
       printf(" \n");
