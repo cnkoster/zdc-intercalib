@@ -9,7 +9,7 @@
 #include <TMath.h>
 #include <TFile.h>
 #include <TCanvas.h>
-#include <TH1.h>
+#include <TH1F.h>
 #include <TH2.h>
 #include <TF1.h>
 #include <TTree.h>
@@ -19,6 +19,7 @@
 #include <TGraph.h>
 #include <TGraphErrors.h>
 #include <TMinuit.h>
+#include <TProfile.h>
 #include <TDirectoryFile.h>
 
 #endif
@@ -29,7 +30,7 @@ static void fcn(int &np, double *gin, double &f, double *par, int iflag);
 int minimization(int ih); 
 TCanvas* plotTProfiles(std::vector<TProfile*> profiles, const char* name);
 
-constexpr double kVeryNegative = -1.e12; // assign this when ZDC when energy is negative 
+constexpr double kVeryNegative = 1./(1.e8); 
 //
 constexpr int ndet = 2; 
 constexpr int npar = 6; 
@@ -38,31 +39,20 @@ static double mSum[ndet][npar][npar];
 static double mAdd[npar][npar];
 //
 const float xmin = -0.5;
-const float xmax = 8000;
+const float xmax = 499.5;
 //
 const float lowbnd = 0.1;
-const float uppbnd = 10.;
+const float uppbnd = 1.6;
 const float start = 0.8; 
-const float step = 0.01;
-
+const float step = 0.1;
 bool deming = true;
 //
 double coeff[ndet][npar], coefferr[ndet][npar]; 
 
-TH1F *ZNCcalibcoeff = new TH1F("ZNCcalibcoeff","Calib Coeff ZNC", 4, 0, 4);
-ZNCcalibcoeff->GetXaxis()->SetBinLabel(1,"pmq1");
-ZNCcalibcoeff->GetXaxis()->SetBinLabel(2,"pmq2");
-ZNCcalibcoeff->GetXaxis()->SetBinLabel(3,"pmq3");
-ZNCcalibcoeff->GetXaxis()->SetBinLabel(4,"pmq4");
+TH1F *ZNCcalibcoeff = new TH1F("ZNCcalibcoeff","Calib Coefficients ZNC", 4, 0, 4);
+TH1F *ZNAcalibcoeff = new TH1F("ZNAcalibcoeff","Calib Coefficients ZNA", 4, 0, 4);
 
-TH1F *ZNAcalibcoeff = new TH1F("ZNAcalibcoeff","Calib Coeff ZNA", 4, 0, 4);
-ZNAcalibcoeff->GetXaxis()->SetBinLabel(1,"pmq1");
-ZNAcalibcoeff->GetXaxis()->SetBinLabel(2,"pmq2");
-ZNAcalibcoeff->GetXaxis()->SetBinLabel(3,"pmq3");
-ZNAcalibcoeff->GetXaxis()->SetBinLabel(4,"pmq4");
-
-
-void interCalibZN (TString inputfilename = "treeZNpms.root")
+void interCalibZN (TString inputfilename = "AO2Dnoor.root")
 {
   TFile *fin = TFile::Open(inputfilename.Data(),"READ");
   if(!fin) {
@@ -70,7 +60,7 @@ void interCalibZN (TString inputfilename = "treeZNpms.root")
     return;
   }
 
-  TDirectoryFile* df = (TDirectoryFile*)fin->Get("DF_2336995099171200");
+  TDirectoryFile* df = (TDirectoryFile*)fin->Get("DF_2406380159021312");
   if(!df){
 	  printf("Directory missing -> PLEASE CHECK FILE NAME!!! \n");
 	  return;
@@ -82,21 +72,20 @@ void interCalibZN (TString inputfilename = "treeZNpms.root")
 	  return;
   }  
 
-  tree->Print("");
+  //tree->Print("");
   Int_t nentries = (Int_t) tree->GetEntries();
   printf("      Tree has %d entries\n\n", nentries);
 
-
-  float pmcZNA;
-  float pm1ZNA;
-  float pm2ZNA;
-  float pm3ZNA;
-  float pm4ZNA;
-  float pmcZNC;
-  float pm1ZNC;
-  float pm2ZNC;
-  float pm3ZNC;
-  float pm4ZNC;
+  float pmcZNA = 0.;
+  float pm1ZNA = 0.;
+  float pm2ZNA = 0.;
+  float pm3ZNA = 0.;
+  float pm4ZNA = 0.;
+  float pmcZNC = 0.;
+  float pm1ZNC = 0.;
+  float pm2ZNC = 0.;
+  float pm3ZNC = 0.;
+  float pm4ZNC = 0.;
   
   tree->SetBranchAddress("fpmcZNA", &pmcZNA);
   tree->SetBranchAddress("fpm1ZNA", &pm1ZNA);
@@ -109,26 +98,26 @@ void interCalibZN (TString inputfilename = "treeZNpms.root")
   tree->SetBranchAddress("fpm3ZNC", &pm3ZNC);
   tree->SetBranchAddress("fpm4ZNC", &pm4ZNC);
 
-  TH1F *hpmcZNC = new TH1F("hpmcZNC"," PMC ZNC", 40, xmin, xmax);
-  TH1F *hpmcZNA = new TH1F("hpmcZNA"," PMC ZNA", 40, xmin, xmax);
-  TH1F *hsumZNC = new TH1F("hsumZNC"," uncalibrated SUMq ZNC", 40, xmin, xmax);
-  TH1F *hsumZNA = new TH1F("hsumZNA"," uncalibrated SUMq ZNA", 40, xmin, xmax);
-
-  TH1F *hsumZNC_cal = new TH1F("hsumZNC_cal","calibrated SUMq ZNC", 40, xmin, xmax);
-  TH1F *hsumZNA_cal = new TH1F("hsumZNA_cal","calibrated SUMq ZNA", 40, xmin, xmax);
-
   int nbins = 100; 
+  TH1F *hpmcZNC = new TH1F("hpmcZNC"," PMC ZNC", nbins, xmin, xmax);
+  TH1F *hpmcZNA = new TH1F("hpmcZNA"," PMC ZNA", nbins, xmin, xmax);
+  TH1F *hsumZNC = new TH1F("hsumZNC"," uncalibrated SUMq ZNC", nbins, xmin, xmax);
+  TH1F *hsumZNA = new TH1F("hsumZNA"," uncalibrated SUMq ZNA", nbins, xmin, xmax);
+
+  TH1F *hsumZNC_cal = new TH1F("hsumZNC_cal","calibrated SUMq ZNC", nbins, xmin, xmax);
+  TH1F *hsumZNA_cal = new TH1F("hsumZNA_cal","calibrated SUMq ZNA", nbins, xmin, xmax);
+
   TH2F *hpmcZNC_vs_sum = new TH2F("hpmcZNC_vs_sum", "pmcq vs. sum ZNC", nbins, xmin, xmax, nbins, xmin, xmax); 
   TH2F *hpmcZNA_vs_sum = new TH2F("hpmcZNA_vs_sum", "pmcq vs. sum ZNA", nbins, xmin, xmax, nbins, xmin, xmax); 
 
   TH2F *hpmcZNC_vs_sum_cal = new TH2F("hpmcZNC_vs_sum_cal", "pmcq vs. calibrated sum ZNC", nbins, xmin, xmax, nbins, xmin, xmax); 
   TH2F *hpmcZNA_vs_sum_cal = new TH2F("hpmcZNA_vs_sum_cal", "pmcq vs. calibrated sum ZNA", nbins, xmin, xmax, nbins, xmin, xmax); 
 
-  TProfile *hpmcZNC_vs_sum_tp = new TProfile("hpmcZNC_vs_sum_tp", "Before", nbins, xmin, xmax);
-  TProfile *hpmcZNA_vs_sum_tp = new TProfile("hpmcZNA_vs_sum_tp", "Before", nbins, xmin, xmax);
+  TProfile *hpmcZNC_vs_sum_tp = new TProfile("hpmcZNC_vs_sum_tp", "Before equalization", nbins, xmin, xmax);
+  TProfile *hpmcZNA_vs_sum_tp = new TProfile("hpmcZNA_vs_sum_tp", "Before equalization", nbins, xmin, xmax);
 
-  TProfile *hpmcZNC_vs_sum_cal_tp = new TProfile("hpmcZNC_vs_sum_cal_tp", "After", nbins, xmin, xmax);
-  TProfile *hpmcZNA_vs_sum_cal_tp = new TProfile("hpmcZNA_vs_sum_cal_tp", "After", nbins, xmin, xmax);
+  TProfile *hpmcZNC_vs_sum_cal_tp = new TProfile("hpmcZNC_vs_sum_cal_tp", "After equalization", nbins, xmin, xmax);
+  TProfile *hpmcZNA_vs_sum_cal_tp = new TProfile("hpmcZNA_vs_sum_cal_tp", "After equalization", nbins, xmin, xmax);
 
 
   for(Int_t iev=0; iev<nentries; iev++){
@@ -137,26 +126,24 @@ void interCalibZN (TString inputfilename = "treeZNpms.root")
 
     tree->GetEntry(iev);
     //
-    bool isZNChit = true, isZNAhit = true;
+    bool isZNChit = false;
+    bool isZNAhit = false;
 
-    if (pmcZNC < kVeryNegative) {
-      pmcZNC = kVeryNegative;
-      isZNChit = false;
+    if (pmcZNC > kVeryNegative) {
+      isZNChit = true;
     }
-    if (pmcZNA < kVeryNegative) {
-      pmcZNA = kVeryNegative;
-      isZNAhit = false;
+    if (pmcZNA > kVeryNegative) {
+      isZNAhit = true;
     }
 
-    if(pm1ZNC==0 || pm2ZNC==0 || pm3ZNC==0 || pm4ZNC==0 ) {
+    /*if(pm1ZNC==0 || pm2ZNC==0 || pm3ZNC==0 || pm4ZNC==0 ) {
       // printf("One of your ZNC towers has zero energy... Thats weird. (%i) \n", iev );
       isZNChit = false;
       }
     if(pm1ZNA==0 || pm2ZNA==0 || pm3ZNA==0 || pm4ZNA==0 ) {
       // printf("One of your ZNA towers has zero energy... Thats weird. (%i) \n", iev );
       isZNAhit = false;
-      }
-
+    }*/
     //
     auto sumZNC = kVeryNegative;
     auto sumZNA = kVeryNegative;
@@ -166,7 +153,7 @@ void interCalibZN (TString inputfilename = "treeZNpms.root")
       hpmcZNC->Fill(pmcZNC);
       hsumZNC->Fill(sumZNC);
       hpmcZNC_vs_sum->Fill(pmcZNC, sumZNC);
-      hpmcZNC_vs_sum_tp->Fill(pmcZNC, sumZNC-pmcZNC);
+      hpmcZNC_vs_sum_tp->Fill(pmcZNC, (sumZNC-pmcZNC)/pmcZNC);
       //
       cumulate(0, pmcZNC, pm1ZNC, pm2ZNC, pm3ZNC, pm4ZNC, 1.);
     }
@@ -175,7 +162,7 @@ void interCalibZN (TString inputfilename = "treeZNpms.root")
       hpmcZNA->Fill(pmcZNA);
       hsumZNA->Fill(sumZNA);
       hpmcZNA_vs_sum->Fill(pmcZNA, sumZNA);
-      hpmcZNA_vs_sum_tp->Fill(pmcZNA, sumZNA-pmcZNA);
+      hpmcZNA_vs_sum_tp->Fill(pmcZNA, (sumZNA-pmcZNA)/pmcZNA);
       //
       cumulate(1, pmcZNA, pm1ZNA, pm2ZNA, pm3ZNA, pm4ZNA, 1.);
     }
@@ -224,14 +211,14 @@ void interCalibZN (TString inputfilename = "treeZNpms.root")
       double sumqcorrC = pm1ZNC * (coeff[0][1]) + pm2ZNC * (coeff[0][2]) + pm3ZNC * (coeff[0][3]) + pm4ZNC * (coeff[0][4]);
       hsumZNC_cal->Fill(sumqcorrC);
       hpmcZNC_vs_sum_cal->Fill(pmcZNC, sumqcorrC);
-      hpmcZNC_vs_sum_cal_tp->Fill(pmcZNC, sumqcorrC-pmcZNC);
+      hpmcZNC_vs_sum_cal_tp->Fill(pmcZNC, (sumqcorrC-pmcZNC)/pmcZNC);
 
     }
     if(isZNAhit) {
       float sumqcorrA = pm1ZNA * (coeff[1][1]) + pm2ZNA * (coeff[1][2]) + pm3ZNA * (coeff[1][3]) + pm4ZNA * (coeff[1][4]);
       hsumZNA_cal->Fill(sumqcorrA);
       hpmcZNA_vs_sum_cal->Fill(pmcZNA, sumqcorrA);
-      hpmcZNA_vs_sum_cal_tp->Fill(pmcZNA, sumqcorrA-pmcZNA);
+      hpmcZNA_vs_sum_cal_tp->Fill(pmcZNA, (sumqcorrA-pmcZNA)/pmcZNA);
     }
 
   } 
@@ -289,35 +276,30 @@ void cumulate(int ih, double tc, double t1, double t2, double t3, double t4, dou
     val[2] = t2;
     val[3] = t3;
     val[4] = t4;
-    printf(" det.%d \t mSum \n ", ih);
+    //printf(" det.%d \t mSum \n ", ih);
     for (int32_t i = 0; i < npar; i++) { 
       for (int32_t j = i; j < npar; j++) {
         mSum[ih][i][j] += val[i] * val[j] * w; 
-        printf(" %1.0f ", mSum[ih][i][j]);
+        //printf(" %1.0f ", mSum[ih][i][j]);
       }
       
-      printf(" \n");
+      //printf(" \n");
     }
-    printf(" \n");
+    //printf(" \n");
 
 }
 
-static void fcn(int &np, double *gin, double &f, double *par, int iflag)  
+void fcn(int& npar, double* gin, double& chi, double* par, int iflag)
 {
-    // Calculate chisquare
-    Double_t chi = 0;
-    // NOTE: changed <np to <= np to include np=4 because otherwise the 4th parameter is not determined.. 
-    for (int32_t i = 0; i < npar; i++) {
-      for (int32_t j = 0; j < npar; j++) {
-        chi += (i == 0 ? par[i] : -par[i]) * (j == 0 ? par[j] : -par[j]) * mAdd[i][j];
-      }
+  chi = 0;
+  for (int32_t i = 0; i < npar; i++) {
+    for (int32_t j = 0; j < npar; j++) {
+      chi += (i == 0 ? par[i] : -par[i]) * (j == 0 ? par[j] : -par[j]) * mAdd[i][j];
     }
-    // printf("it changed.");
-
-    if(deming) chi = chi / (1 + par[1] * par[1] + par[2] * par[2] + par[3] * par[3] + par[4] * par[4]);
-
-    f = chi;
-    // printf("chi_sq = %e   | np = %i \n", f, np); 
+  }
+  // Following line modifies the chisquare computation (sum of squares of residuals)
+  // to perform orthogonal least squares instead of ordinary least squares minimization
+  chi = chi / (1 + par[1] * par[1] + par[2] * par[2] + par[3] * par[3] + par[4] * par[4]);
 }
 
 int minimization(int ih)
@@ -348,9 +330,9 @@ int minimization(int ih)
     // So this is done to fit, but what exactly are we fitting? 
     TMinuit *gMinuit = new TMinuit(npar);  
     gMinuit->SetFCN(fcn);
-    
+    //
     //arglist[0] = 1;
-    gMinuit->mnexcm("SET ERR", arglist , 1, ierflg);
+    //gMinuit->mnexcm("SET ERR", arglist , 1, ierflg);
     
     // Set starting values and step sizes for parameters
     // The common PM is not minimized...
@@ -360,13 +342,10 @@ int minimization(int ih)
     gMinuit->mnparm(2, "c2", start, step, lowbnd, uppbnd, ierflg);
     gMinuit->mnparm(3, "c3", start, step, lowbnd, uppbnd, ierflg);
     gMinuit->mnparm(4, "c4", start, step, lowbnd, uppbnd, ierflg);
-    gMinuit->mnparm(5, "c5",    1.,   0.,     1.,     1., ierflg);
+    gMinuit->mnparm(5, "offset", 0,    0, lowbnd, uppbnd, ierflg);
 
     // Minimization step
-    //arglist[0] = 500;
-    //arglist[1] = 1.;
     gMinuit->mnexcm("MIGRAD", arglist, 0, ierflg);
-
     
     for ( int i = 0; i < npar; i++) {
       gMinuit->GetParameter(i, coeff[ih][i], coefferr[ih][i]);
@@ -388,13 +367,17 @@ int minimization(int ih)
     printf("\t pmq1 %f  pmq2 %f  pmq3 %f  pmq4 %f \n", coeff[ih][1], coeff[ih][2], coeff[ih][3], coeff[ih][4]);
     printf("\t\t _____________________ ERRORS _____________________\n");
     printf("\t pmq1 %f  pmq2 %f  pmq3 %f  pmq4 %f \n\n", coefferr[ih][1], coefferr[ih][2], coefferr[ih][3], coefferr[ih][4]);
-
     
-    
-    // OFFSET NON IMPLEMENTED FOR THE TIME BEING!
-    // see $O2/Detectors/ZDC/calib/src/InterCalib.cxx to see how it is done on raw data
+    ZNCcalibcoeff->GetXaxis()->SetBinLabel(1,"pmq1");
+    ZNCcalibcoeff->GetXaxis()->SetBinLabel(2,"pmq2");
+    ZNCcalibcoeff->GetXaxis()->SetBinLabel(3,"pmq3");
+    ZNCcalibcoeff->GetXaxis()->SetBinLabel(4,"pmq4");
+    ZNAcalibcoeff->GetXaxis()->SetBinLabel(1,"pmq1");
+    ZNAcalibcoeff->GetXaxis()->SetBinLabel(2,"pmq2");
+    ZNAcalibcoeff->GetXaxis()->SetBinLabel(3,"pmq3");
+    ZNAcalibcoeff->GetXaxis()->SetBinLabel(4,"pmq4");    
 
-     return ierflg;
+    return ierflg;
 }
 
 // **********************************************************************************
@@ -452,20 +435,23 @@ TCanvas* plotTProfiles(std::vector<TProfile*> profiles, const char* name){
   // Function to plot TProfiles on canvas and ratio to linear function> 
   TCanvas* c1Data = new TCanvas(TString::Format("TProfiles Before and after calibration %s", name), TString::Format("TProfiles Before and after calibration %s", name), 800, 800);
   TLegend* leg = new TLegend(0.20, 0.72, 0.51, 0.83);
-  leg->SetTextSize(28);
+  leg->SetTextSize(0.04);
 
   c1Data->cd(); 
   int i=0; 
   for(TProfile* profile : profiles){ 
     if(i==0){ 
-      profile->GetXaxis()->SetTitle("Energy pmc");
-      profile->GetYaxis()->SetTitle("Sum-pmc");
-      profile->GetYaxis()->SetTitleOffset(1.9);
+      profile->GetXaxis()->SetTitle("Energy PMC");
+      profile->GetYaxis()->SetTitle("sum-common (%)");
+      profile->GetYaxis()->SetRangeUser(0.,1.2);
+      profile->GetYaxis()->SetTitleOffset(1.6);
       profile->GetYaxis()->SetMaxDigits(3);
       profile->GetXaxis()->SetMaxDigits(3);
+      profile->SetMarkerStyle(24);
       profile->Draw("PLC PMC"); 
     } 
     else{
+      profile->SetMarkerStyle(20);
       profile->Draw("PLC PMC SAME");
       }
       leg->AddEntry(profile, TString::Format("%s", profile->GetTitle()), "lp"); 
